@@ -1,23 +1,16 @@
-# Visual Reference Skill
+# 视觉风格参考收集skill
 
-从 Pinterest、Behance 自动搜集视觉参考图，生成确认看板，并在用户确认后输出 Figma 演示幻灯片。
+从Pinterest、Behance、站酷等平台搜集视觉参考图，输出可编辑视觉风格情绪板。
 
 ## 功能
 
 - 在浏览器中搜索关键词，浏览并筛选相关图片
 - 将参考图保存到本地文件夹，并记录来源信息
-- 生成 PNG 确认看板，供你审阅后再继续
-- 确认后自动在 Figma 中创建 16:9 演示页
+- 在Figma输出可编辑视觉风格情绪板
 
 ## 安装
 
 ### 1. 克隆到技能目录
-
-**Cursor：**
-
-```bash
-git clone https://github.com/effiezhu0-0/visual-reference-skill.git ~/.cursor/skills/reference-image-scraper
-```
 
 **Codex：**
 
@@ -27,7 +20,7 @@ git clone https://github.com/effiezhu0-0/visual-reference-skill.git ~/.codex/ski
 
 ### 2. 安装依赖
 
-确认看板脚本需要 Pillow：
+确认看板脚本需要Pillow：
 
 ```bash
 pip install pillow
@@ -35,9 +28,9 @@ pip install pillow
 
 ### 3. 前置条件
 
-- 已启用 **浏览器** 技能（用于打开 Pinterest / Behance）
+- 已启用 **内置浏览器** 技能（用于打开平台）
 - 已启用 **Figma MCP**（用于生成最终幻灯片）
-- Pinterest / Behance 如需登录，请在浏览器内手动登录
+- Pinterest / Behance等平台如需登录，请在浏览器内手动登录
 
 ## 使用
 
