@@ -1,9 +1,6 @@
 # 视觉风格参考收集 Skill
 
 ## 基础信息
-
-- 提交人：朱若焉
-- 维护人：朱若焉
 - 所属业务域：主站营销互动
 - 当前状态：进行中 50%
 
@@ -123,3 +120,7 @@ reference-images-<关键词>-YYYYMMDD/
 ├── manifest.json
 └── confirmation-board.png
 ```
+
+## 作者
+
+Effie Zhu
