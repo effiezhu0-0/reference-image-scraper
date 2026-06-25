@@ -4,9 +4,8 @@
 from __future__ import annotations
 
 import json
-import math
 import sys
-from datetime import date
+from collections import Counter
 from pathlib import Path
 
 try:
@@ -18,91 +17,77 @@ except ImportError as exc:
 
 
 W, H = 1920, 1080
-MARGIN = 64
-GAP = 24
-BG = (248, 247, 242)
-INK = (30, 32, 34)
-MUTED = (99, 104, 110)
-CARD = (255, 255, 255)
-LINE = (222, 219, 210)
-ACCENT = (196, 62, 48)
+BG = (0x17, 0x17, 0x19)
+TEXT = (0xFF, 0xFF, 0xFF)
+
+TITLE_POS = (60, 48)
+TITLE_SIZE = 32
+
+ROW_CATEGORY_POSITIONS = ((60, 205), (60, 638))
+CATEGORY_SIZE = 26
+
+IMG_W, IMG_H = 344, 245
+IMG_X = (60, 424, 788, 1152, 1516)
+ROW_Y = (261, 694)
+MAX_ITEMS = 10
 
 
-def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = [
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/Library/Fonts/Arial.ttf",
+        ("/System/Library/Fonts/PingFang.ttc", 1),
+        ("/System/Library/Fonts/PingFang.ttc", 0),
+        ("/Library/Fonts/PingFang.ttc", 1),
+        ("/System/Library/Fonts/STHeiti Medium.ttc", 0),
+        ("/System/Library/Fonts/Supplemental/Arial.ttf", 0),
+        ("/System/Library/Fonts/Helvetica.ttc", 0),
     ]
-    for path in candidates:
+    for path, index in candidates:
         try:
-            return ImageFont.truetype(path, size)
+            return ImageFont.truetype(path, size, index=index)
         except OSError:
             continue
     return ImageFont.load_default()
 
 
-TITLE = font(42, True)
-SUBTITLE = font(20)
-LABEL = font(19, True)
-BODY = font(16)
-SMALL = font(13)
-
-
-def wrap_text(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.ImageFont, max_width: int, max_lines: int) -> list[str]:
-    words = (text or "").split()
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        test = f"{current} {word}".strip()
-        if draw.textlength(test, font=fnt) <= max_width:
-            current = test
-        else:
-            if current:
-                lines.append(current)
-            current = word
-        if len(lines) >= max_lines:
-            break
-    if current and len(lines) < max_lines:
-        lines.append(current)
-    if len(lines) == max_lines and words:
-        while lines[-1] and draw.textlength(lines[-1] + "...", font=fnt) > max_width:
-            lines[-1] = lines[-1][:-1]
-        lines[-1] = lines[-1].rstrip() + "..."
-    return lines
+TITLE_FONT = font(TITLE_SIZE)
+CATEGORY_FONT = font(CATEGORY_SIZE)
 
 
 def fit_image(path: Path, size: tuple[int, int]) -> Image.Image:
     try:
         img = Image.open(path).convert("RGB")
-    except Exception:
-        img = Image.new("RGB", size, (230, 230, 230))
+    except OSError:
+        img = Image.new("RGB", size, (40, 40, 42))
     return ImageOps.fit(img, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
 
-def draw_card(draw: ImageDraw.ImageDraw, canvas: Image.Image, folder: Path, item: dict, box: tuple[int, int, int, int]) -> None:
-    x, y, w, h = box
-    draw.rounded_rectangle((x, y, x + w, y + h), radius=8, fill=CARD, outline=LINE, width=2)
-    img_h = int(h * 0.64)
-    img = fit_image(folder / item.get("filename", ""), (w - 24, img_h))
-    canvas.paste(img, (x + 12, y + 12))
+def row_category_label(items: list[dict]) -> str:
+    if not items:
+        return ""
+    labels = [item.get("category") or item.get("keyword") or "Reference" for item in items]
+    return Counter(labels).most_common(1)[0][0]
 
-    text_x = x + 16
-    text_y = y + 24 + img_h
-    text_w = w - 32
-    category = item.get("category") or item.get("keyword") or "Reference"
-    description = item.get("description") or item.get("filename") or ""
-    source = item.get("creator_or_project") or item.get("platform") or ""
-    method = item.get("capture_method") or ""
 
-    draw.text((text_x, text_y), category, fill=INK, font=LABEL)
-    text_y += 30
-    for line in wrap_text(draw, description, BODY, text_w, 2):
-        draw.text((text_x, text_y), line, fill=INK, font=BODY)
-        text_y += 22
-    source_line = " | ".join(part for part in [source, method] if part)
-    for line in wrap_text(draw, source_line, SMALL, text_w, 1):
-        draw.text((text_x, y + h - 32), line, fill=MUTED, font=SMALL)
+def board_title(data: dict) -> str:
+    title = (data.get("title") or "").strip()
+    if title:
+        return title
+    keywords = [kw.strip() for kw in data.get("keywords", []) if kw and str(kw).strip()]
+    if keywords:
+        return " / ".join(keywords)
+    return "Reference image board"
+
+
+def split_rows(items: list[dict]) -> tuple[list[dict], list[dict]]:
+    selected = items[:MAX_ITEMS]
+    return selected[:5], selected[5:10]
+
+
+def draw_image_row(canvas: Image.Image, folder: Path, items: list[dict], y: int) -> None:
+    for col, item in enumerate(items[:5]):
+        x = IMG_X[col]
+        img = fit_image(folder / item.get("filename", ""), (IMG_W, IMG_H))
+        canvas.paste(img, (x, y))
 
 
 def main() -> int:
@@ -113,37 +98,25 @@ def main() -> int:
     manifest_path = Path(sys.argv[1]).expanduser().resolve()
     folder = manifest_path.parent
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    items = data.get("items", [])[:12]
+    items = data.get("items", [])
 
     canvas = Image.new("RGB", (W, H), BG)
     draw = ImageDraw.Draw(canvas)
 
-    title = data.get("title") or "Reference image board"
-    platforms = ", ".join(data.get("platforms", []))
-    keywords = ", ".join(data.get("keywords", []))
-    created_at = data.get("created_at") or date.today().isoformat()
-    subtitle = " | ".join(part for part in [platforms, keywords, created_at] if part)
+    draw.text(TITLE_POS, board_title(data), fill=TEXT, font=TITLE_FONT)
 
-    draw.text((MARGIN, 42), title, fill=INK, font=TITLE)
-    draw.rectangle((MARGIN, 106, MARGIN + 96, 112), fill=ACCENT)
-    draw.text((MARGIN, 128), subtitle, fill=MUTED, font=SUBTITLE)
+    row1_items, row2_items = split_rows(items)
+    rows = (row1_items, row2_items)
 
     if not items:
-        draw.text((MARGIN, 240), "No image items found in manifest.", fill=INK, font=SUBTITLE)
+        message = "No image items found in manifest."
+        draw.text((60, 261), message, fill=TEXT, font=CATEGORY_FONT)
     else:
-        count = len(items)
-        cols = 4 if count > 6 else 3
-        rows = math.ceil(count / cols)
-        top = 190
-        available_w = W - MARGIN * 2 - GAP * (cols - 1)
-        available_h = H - top - MARGIN - GAP * (rows - 1)
-        card_w = available_w // cols
-        card_h = available_h // rows
-        for idx, item in enumerate(items):
-            row, col = divmod(idx, cols)
-            x = MARGIN + col * (card_w + GAP)
-            y = top + row * (card_h + GAP)
-            draw_card(draw, canvas, folder, item, (x, y, card_w, card_h))
+        for row_items, (cat_x, cat_y), img_y in zip(rows, ROW_CATEGORY_POSITIONS, ROW_Y):
+            if not row_items:
+                continue
+            draw.text((cat_x, cat_y), row_category_label(row_items), fill=TEXT, font=CATEGORY_FONT)
+            draw_image_row(canvas, folder, row_items, img_y)
 
     output = folder / "confirmation-board.png"
     canvas.save(output)
